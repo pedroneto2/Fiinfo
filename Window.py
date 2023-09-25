@@ -1,6 +1,6 @@
-import sqlite3
-from PyQt6.QtWidgets import QMainWindow, QTableWidgetItem, QTableWidget
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QMainWindow, QTableWidgetItem
+from PyQt6.QtCore import Qt, QCoreApplication
+from PyQt6.QtGui import QFont
 from sqlite3.dbapi2 import connect
 from DataBuilder import DataBuilder
 
@@ -17,73 +17,192 @@ class Window(QMainWindow):
         
         self.ui.addFiiPushButton.clicked.connect(self.addFiiToTable)
         self.ui.removeFiiPushButton.clicked.connect(self.removeFiiFromTable)
+        self.ui.pushButton.clicked.connect(self.filterGroup)
+        self.ui.actionyields_12M_projetado.triggered.connect(self.updateProjectedData)
         
+        self.ui.ntnbLineEdit.setText(str(self.dataBuilder.ntnbTax))
+        self.ui.ipcaLineEdit.setText(str(self.dataBuilder.ipca))
         connection = self.createDbConnection()
-        self.updateTable(connection)
+        self.loadFilterGroups(connection)
+        self.updateData(connection)
         connection.close()
     
-    def updateTable(self, connection):
-        sql = 'SELECT * FROM fiis'
+    def updateTable(self, connection, filter = ''):
+        if filter:
+            filter = f"WHERE grupo = '{filter}'"
+        sql = f"SELECT * FROM fiis {filter} ORDER BY grupo, p_vp"
         cursor = connection.cursor()
         cursor.execute(sql)
         rows = cursor.fetchall()
         rowsLength = len(rows)
-        if rows:
-            columnsLength = len(rows[0])
-        else:
-            columnsLength = 0
+        columnsLength = 11 if rows else 0
         self.ui.fiiTableWidget.setRowCount(rowsLength)
         self.ui.fiiTableWidget.setColumnCount(columnsLength)
-        headerLabels = ['grupo', 'ticker', 'valor atual (R$)', 'yield 12M (%)', 'P/VP', 
-                        'yield 12M projetado (%)', 'premio (%)', 'preco teto (R$)', 
-                        'preco teto projetado (R$)', 'preco teto / valor atual',
-                        'preco teto projetado / valor atual']
+        headerLabels = ['grupo', 'ticker', 'valor atual\n(R$)', 'P/VP', 'premio (%)', 
+                        '+ IPCA?', 'yield 12M\n(%)', 'yield 12M\nprojetado\n(R$)', 'preco teto\n(R$)', 
+                        'preco teto\nprojetado\n(R$)', 'preco teto\n/\nvalor atual',
+                        'preco teto\nprojetado /\nvalor atual']
         self.ui.fiiTableWidget.setHorizontalHeaderLabels(headerLabels)
-        
         for i in range(rowsLength):
+            valorAtual = rows[i][2]
+            premio = rows[i][4]
+            addIpcaToPremio = rows[i][5]
+            yield12 = rows[i][6]
+            rendimento12Projetado = rows[i][7]
+            precoTeto, tetoValor = self.dataBuilder.calculateBaseData(yield12, premio, addIpcaToPremio, valorAtual)
+            yield12Projected, precoTetoProjected, tetoProjetadoValor = self.dataBuilder.calculateProjectedData(rendimento12Projetado, premio, addIpcaToPremio, valorAtual)
             for j in range(columnsLength):
-                item = QTableWidgetItem(f"{rows[i][j]}")
-                self.ui.fiiTableWidget.setItem(i,j, item)
+                if j == 5:
+                   item = bool(addIpcaToPremio)
+                elif j == 7:
+                   item = yield12Projected
+                elif j == 8:
+                    item = precoTeto
+                elif j == 9:
+                    item = precoTetoProjected
+                elif j == 10:
+                    item = tetoValor
+                elif j == 11:
+                    item = tetoProjetadoValor
+                else:
+                    item = rows[i][j]
+                widgetItem = QTableWidgetItem(f"{item}")
+                flags = Qt.ItemFlag.ItemIsEnabled|Qt.ItemFlag.ItemIsSelectable
+                if j == 4 or j == 5:
+                    flags = flags|Qt.ItemFlag.ItemIsEditable
+                widgetItem.setFlags(flags)
+                widgetItem.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.ui.fiiTableWidget.setItem(i,j, widgetItem)
     
     def createDbConnection(self):
         return connect(self.database)
     
-    def operateTable(self, sql, sql_array):
-        connection = self.createDbConnection()
+    def operateTable(self, sql, sql_array, connection = False):
+        initialConnection = connection
+        if not connection:
+            connection = self.createDbConnection()
         cursor = connection.cursor()
         cursor.execute(sql, sql_array)
         connection.commit()
         cursor.close()
         self.updateTable(connection)
-        connection.close()
+        if not initialConnection:
+            connection.close()
+     
+    def updateData(self, connection):
+        cursor = connection.cursor()
+        rows = self.ui.fiiTableWidget.rowCount()
+        for i in range(rows):
+            self.baseUpdateRow(i, cursor, connection)
+        cursor.close()
+        self.updateTable(connection)
     
-    def insertToTable(self, ticker, premio, grupo):
-        sql = '''INSERT INTO fiis(ticker, premio, valor_atual, grupo)
-                 VALUES (?, ?, ?, ?)'''
+    def baseUpdateRow(self, row, cursor, connection):
+        sql = '''UPDATE fiis
+                 SET valor_atual = ?, yield_12 = ?, p_vp = ?)
+                 WHERE ticker = ?'''
+        tickerRowIndex = self.ui.fiiTableWidget.model().index(row, 0)
+        premioRowIndex = self.ui.fiiTableWidget.model().index(row, 6)
+        ticker = self.ui.fiiTableWidget.model().data(tickerRowIndex)
+        premio = self.ui.fiiTableWidget.model().data(premioRowIndex)
+        valorAtual, yield12, pVp = self.dataBuilder.getBaseData(ticker, float(premio))
+        cursor.execute(sql, [valorAtual, yield12, pVp])
+        connection.commit()
+    
+    def insertToTable(self, ticker, premio, grupo, addIpcaToPremio):
+        sql = '''INSERT INTO fiis(grupo, ticker, valor_atual, p_vp, premio, ipca_no_premio, yield_12, rendimento_12_projetado)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)'''
         if self.ui.fiiTableWidget.findItems(ticker, Qt.MatchFlag.MatchContains):
             return
         else:
-            valor_atual = self.dataBuilder.getPrice(ticker)
-            self.operateTable(sql, [ticker, float(premio), valor_atual, grupo])
+            position = self.ui.comboBox.count()
+            self.addGroupToComboBox(grupo, position)
+            valorAtual, yield12, pVp = self.dataBuilder.getBaseData(ticker, float(premio))
+            rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
+            self.operateTable(sql, [grupo, ticker, valorAtual, pVp, float(premio), addIpcaToPremio, yield12, rendimento12Projected])
         
     def deleteFromTable(self, ticker):
         sql = 'DELETE FROM fiis WHERE ticker = ?'
-        self.operateTable(sql, [ticker])
+        connection = self.createDbConnection()
+        self.operateTable(sql, [ticker], connection)
+        self.loadFilterGroups(connection)
+        connection.close()
         
     def addFiiToTable(self):
+        self.enableDisableAll(True)
         ticker = self.ui.tickerLineEdit.text()
         premio = self.ui.premioLineEdit.text()
         grupo = self.ui.grupoLineEdit.text()
+        addIpcaToPremio = self.ui.addIpcaCheckBox.isChecked()
         if ticker and premio and grupo:
-            self.insertToTable(ticker, premio, grupo)
+            self.insertToTable(ticker, premio, grupo, addIpcaToPremio)
+            self.enableDisableAll(False)
         else:
+            self.enableDisableAll(False)
             return
             
     def removeFiiFromTable(self):
+        self.enableDisableAll(True)
         currentRow = self.ui.fiiTableWidget.currentRow()
-        tickerRowIndex = self.ui.fiiTableWidget.model().index(currentRow, 0)
-        ticker = self.ui.fiiTableWidget.model().data(tickerRowIndex)
+        itemRowIndex = self.ui.fiiTableWidget.model().index(currentRow, 1)
+        ticker = self.ui.fiiTableWidget.model().data(itemRowIndex)
         if ticker:
             self.deleteFromTable(ticker)
+            self.enableDisableAll(False)
         else:
+            self.enableDisableAll(False)
             return
+    
+    def filterGroup(self):
+        self.enableDisableAll(True)
+        connection = self.createDbConnection()
+        filter = self.ui.comboBox.currentText()
+        if filter == 'Todos':
+            filter = ''
+        self.updateTable(connection, filter)
+        connection.close()
+        self.enableDisableAll(False)
+        
+    def addGroupToComboBox(self, group, position):
+        groupExists = self.ui.comboBox.findText(group)
+        if groupExists == -1:
+            _translate = QCoreApplication.translate
+            font = QFont()
+            font.setPointSize(12)
+            self.ui.comboBox.setFont(font)
+            self.ui.comboBox.setObjectName("comboBox")
+            self.ui.comboBox.addItem("")
+            self.ui.comboBox.setItemText(position, _translate("MainWindow", group))
+    
+    def loadFilterGroups(self, connection):
+        sql = 'SELECT DISTINCT grupo FROM fiis'
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        groups = cursor.fetchall()
+        i = 1
+        while i < self.ui.comboBox.count():
+            self.ui.comboBox.removeItem(i)
+        i = 1
+        for group in groups:
+            group = str(group).split("'")[1]
+            self.addGroupToComboBox(group, i)
+            i+= 1
+            
+    def updateProjectedData(self):
+        self.enableDisableAll(True)
+        sql = "SELECT ticker FROM fiis"
+        connection = self.createDbConnection()
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        tickers = cursor.fetchall()
+        for ticker in tickers:
+            sql = "UPDATE fiis SET rendimento_12_projetado = ? WHERE ticker = ?"
+            ticker = str(ticker).split("'")[1]
+            rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
+            self.operateTable(sql, [rendimento12Projected, ticker], connection)
+        connection.close()
+        self.enableDisableAll(False)
+        
+    def enableDisableAll(self, boolean):
+        self.ui.centralwidget.setDisabled(boolean)
+        self.ui.menubar.setDisabled(boolean)
