@@ -6,7 +6,7 @@ from DataBuilder import DataBuilder
 
 from Window_UI import Ui_MainWindow
 
-class Window(QMainWindow):
+class Window(QMainWindow):    
     def __init__(self):
         super().__init__()
         self.ui = Ui_MainWindow()
@@ -20,12 +20,14 @@ class Window(QMainWindow):
         self.ui.pushButton.clicked.connect(self.filterGroup)
         self.ui.actionyields_12M_projetado.triggered.connect(self.updateProjectedData)
         
+        self.setLoading(True)
         self.ui.ntnbLineEdit.setText(str(self.dataBuilder.ntnbTax))
         self.ui.ipcaLineEdit.setText(str(self.dataBuilder.ipca))
         connection = self.createDbConnection()
         self.loadFilterGroups(connection)
         self.updateData(connection)
         connection.close()
+        self.setLoading(False)
     
     def updateTable(self, connection, filter = ''):
         if filter:
@@ -35,7 +37,7 @@ class Window(QMainWindow):
         cursor.execute(sql)
         rows = cursor.fetchall()
         rowsLength = len(rows)
-        columnsLength = 11 if rows else 0
+        columnsLength = 12 if rows else 0
         self.ui.fiiTableWidget.setRowCount(rowsLength)
         self.ui.fiiTableWidget.setColumnCount(columnsLength)
         headerLabels = ['grupo', 'ticker', 'valor atual\n(R$)', 'P/VP', 'premio (%)', 
@@ -129,39 +131,34 @@ class Window(QMainWindow):
         connection.close()
         
     def addFiiToTable(self):
-        self.enableDisableAll(True)
+        self.setLoading(True)
         ticker = self.ui.tickerLineEdit.text()
         premio = self.ui.premioLineEdit.text()
         grupo = self.ui.grupoLineEdit.text()
         addIpcaToPremio = self.ui.addIpcaCheckBox.isChecked()
         if ticker and premio and grupo:
             self.insertToTable(ticker, premio, grupo, addIpcaToPremio)
-            self.enableDisableAll(False)
-        else:
-            self.enableDisableAll(False)
-            return
+        self.setLoading(False)
+        
             
     def removeFiiFromTable(self):
-        self.enableDisableAll(True)
+        self.setLoading(True)
         currentRow = self.ui.fiiTableWidget.currentRow()
         itemRowIndex = self.ui.fiiTableWidget.model().index(currentRow, 1)
         ticker = self.ui.fiiTableWidget.model().data(itemRowIndex)
         if ticker:
             self.deleteFromTable(ticker)
-            self.enableDisableAll(False)
-        else:
-            self.enableDisableAll(False)
-            return
+        self.setLoading(False)
     
     def filterGroup(self):
-        self.enableDisableAll(True)
+        self.setLoading(True)
         connection = self.createDbConnection()
         filter = self.ui.comboBox.currentText()
         if filter == 'Todos':
             filter = ''
         self.updateTable(connection, filter)
         connection.close()
-        self.enableDisableAll(False)
+        self.setLoading(False)
         
     def addGroupToComboBox(self, group, position):
         groupExists = self.ui.comboBox.findText(group)
@@ -189,7 +186,7 @@ class Window(QMainWindow):
             i+= 1
             
     def updateProjectedData(self):
-        self.enableDisableAll(True)
+        self.setLoading(True)
         sql = "SELECT ticker FROM fiis"
         connection = self.createDbConnection()
         cursor = connection.cursor()
@@ -201,8 +198,17 @@ class Window(QMainWindow):
             rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
             self.operateTable(sql, [rendimento12Projected, ticker], connection)
         connection.close()
-        self.enableDisableAll(False)
+        self.setLoading(False)
         
     def enableDisableAll(self, boolean):
         self.ui.centralwidget.setDisabled(boolean)
         self.ui.menubar.setDisabled(boolean)
+        
+    def setLoading(self, boolean):
+        if boolean:
+            self.ui.statusbar.showMessage('Carregando...')
+            self.enableDisableAll(True)
+            QCoreApplication.processEvents()
+        else:
+            self.ui.statusbar.clearMessage()
+            self.enableDisableAll(False)

@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1200, 800)
+        MainWindow.resize(1300, 800)
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.centralwidget)
@@ -263,6 +263,9 @@ class Ui_MainWindow(object):
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(parent=MainWindow)
         self.statusbar.setObjectName("statusbar")
+        font = QtGui.QFont()
+        font.setPointSize(16)
+        self.statusbar.setFont(font)
         MainWindow.setStatusBar(self.statusbar)
         self.actionyields_12M_projetado = QtGui.QAction(parent=MainWindow)
         self.actionyields_12M_projetado.setObjectName("actionyields_12M_projetado")
