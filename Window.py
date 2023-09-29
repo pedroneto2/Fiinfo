@@ -30,6 +30,7 @@ class Window(QMainWindow):
         self.setLoading(False)
     
     def updateTable(self, connection, filter = ''):
+        self.ui.fiiTableWidget.setSortingEnabled(False)
         if filter:
             filter = f"WHERE grupo = '{filter}'"
         sql = f"SELECT * FROM fiis {filter} ORDER BY grupo, p_vp"
@@ -75,6 +76,7 @@ class Window(QMainWindow):
                 widgetItem.setFlags(flags)
                 widgetItem.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.ui.fiiTableWidget.setItem(i,j, widgetItem)
+        self.ui.fiiTableWidget.setSortingEnabled(True)
     
     def createDbConnection(self):
         return connect(self.database)
