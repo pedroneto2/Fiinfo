@@ -117,11 +117,11 @@ class Window(QMainWindow):
         if self.ui.fiiTableWidget.findItems(ticker, Qt.MatchFlag.MatchContains):
             return
         else:
-            position = self.ui.comboBox.count()
-            self.addGroupToComboBox(grupo, position)
             valorAtual, yield12, pVp = self.dataBuilder.getBaseData(ticker, float(premio))
             rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
             self.operateTable(sql, [grupo, ticker, valorAtual, pVp, float(premio), addIpcaToPremio, yield12, rendimento12Projected])
+            position = self.ui.comboBox.count()
+            self.addGroupToComboBox(grupo, position)
         
     def deleteFromTable(self, ticker):
         sql = 'DELETE FROM fiis WHERE ticker = ?'
@@ -132,13 +132,17 @@ class Window(QMainWindow):
         
     def addFiiToTable(self):
         self.setLoading(True)
-        ticker = self.ui.tickerLineEdit.text()
-        premio = self.ui.premioLineEdit.text()
-        grupo = self.ui.grupoLineEdit.text()
-        addIpcaToPremio = self.ui.addIpcaCheckBox.isChecked()
-        if ticker and premio and grupo:
-            self.insertToTable(ticker, premio, grupo, addIpcaToPremio)
-        self.setLoading(False)
+        errorMessage = ''
+        try:
+            ticker = self.ui.tickerLineEdit.text()
+            premio = self.ui.premioLineEdit.text()
+            grupo = self.ui.grupoLineEdit.text()
+            addIpcaToPremio = self.ui.addIpcaCheckBox.isChecked()
+            if ticker and premio and grupo:
+                self.insertToTable(ticker, premio, grupo, addIpcaToPremio)
+        except:
+            errorMessage = 'ERRO! Por favor, verifique o ticker'
+        self.setLoading(False, errorMessage)
         
             
     def removeFiiFromTable(self):
@@ -187,28 +191,32 @@ class Window(QMainWindow):
             
     def updateProjectedData(self):
         self.setLoading(True)
-        sql = "SELECT ticker FROM fiis"
-        connection = self.createDbConnection()
-        cursor = connection.cursor()
-        cursor.execute(sql)
-        tickers = cursor.fetchall()
-        for ticker in tickers:
-            sql = "UPDATE fiis SET rendimento_12_projetado = ? WHERE ticker = ?"
-            ticker = str(ticker).split("'")[1]
-            rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
-            self.operateTable(sql, [rendimento12Projected, ticker], connection)
-        connection.close()
-        self.setLoading(False)
+        errorMessage = ''
+        try:
+            sql = "SELECT ticker FROM fiis"
+            connection = self.createDbConnection()
+            cursor = connection.cursor()
+            cursor.execute(sql)
+            tickers = cursor.fetchall()
+            for ticker in tickers:
+                sql = "UPDATE fiis SET rendimento_12_projetado = ? WHERE ticker = ?"
+                ticker = str(ticker).split("'")[1]
+                rendimento12Projected = self.dataBuilder.getNext12MProjectedIncome(ticker)
+                self.operateTable(sql, [rendimento12Projected, ticker], connection)
+            connection.close()
+        except:
+            errorMessage = 'ERRO! Tente novamente mais tarde'
+        self.setLoading(False, errorMessage)
         
     def enableDisableAll(self, boolean):
         self.ui.centralwidget.setDisabled(boolean)
         self.ui.menubar.setDisabled(boolean)
         
-    def setLoading(self, boolean):
+    def setLoading(self, boolean, errorMessage = ''):
         if boolean:
             self.ui.statusbar.showMessage('Carregando...')
             self.enableDisableAll(True)
             QCoreApplication.processEvents()
         else:
-            self.ui.statusbar.clearMessage()
+            self.ui.statusbar.showMessage(errorMessage, 5000)
             self.enableDisableAll(False)
