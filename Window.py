@@ -144,6 +144,7 @@ class Window(QMainWindow):
                 self.insertToTable(ticker, premio, grupo, addIpcaToPremio)
         except:
             errorMessage = 'ERRO! Por favor, verifique o ticker'
+        self.ui.comboBox.setCurrentIndex(0)
         self.setLoading(False, errorMessage)
         
             
