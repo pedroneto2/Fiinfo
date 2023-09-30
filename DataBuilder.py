@@ -55,18 +55,12 @@ class DataBuilder:
         return [round(valorAtual, 2), round(yield12, 2), round(pVp, 2)]
     
     def calculateBaseData(self, yield12, premio, addIpcaToPremio, valorAtual):
-        valorAtual = float(valorAtual)
-        ipca = self.ipca if bool(addIpcaToPremio) else 0
-        precoTeto = (float(yield12) / (self.ntnbTax + float(premio) + ipca)) * valorAtual
-        tetoValor = precoTeto / valorAtual
+        precoTeto, tetoValor = self.calculateRootPrice(yield12, premio, addIpcaToPremio, valorAtual)
         return [round(precoTeto, 2), round(tetoValor, 2)]
     
     def calculateProjectedData(self, rendimento12Projected, premio, addIpcaToPremio, valorAtual):
-        valorAtual = float(valorAtual)
-        ipca = self.ipca if bool(addIpcaToPremio) else 0
         yield12Projected = float(rendimento12Projected) * 100 / valorAtual
-        precoTetoProjected = (yield12Projected / (self.ntnbTax + float(premio) + ipca)) * valorAtual
-        tetoProjetadoValor = precoTetoProjected / valorAtual
+        precoTetoProjected, tetoProjetadoValor = self.calculateRootPrice(rendimento12Projected, premio, addIpcaToPremio, valorAtual)
         return [round(yield12Projected, 2), round(precoTetoProjected, 2), round(tetoProjetadoValor, 2)]
         
     def getNext12MProjectedIncome(self, ticker):
@@ -91,7 +85,7 @@ class DataBuilder:
             minValue = q1 - iqr * 0.6
             def filterMaxMin(value):
                 return value >= minValue and value <= maxValue
-            return list(filter(filterMaxMin, copiedArray))
+            return list(filter(filterMaxMin, array))
         def calculatMediums(values):
             return functools.reduce(lambda a, b: a+b, values) / len(values)
         if len(incomes) >= 3 * 12:
@@ -100,8 +94,10 @@ class DataBuilder:
                 yearIncomes.append(copiedIncomes[-12:])
                 copiedIncomes[-12:] = []
             mediumIncomes = list(map(calculatMediums, yearIncomes))
+            mediumIncomes.reverse()
         else:
             mediumIncomes = filterOutliers(incomes)
+        mediumIncomes = filterOutliers(mediumIncomes)
         def simpleLinearRegression(y):
             n = len(y)
             sumX, sumY, sumXY, sumXX, sumYY = 0, 0, 0, 0, 0
@@ -118,7 +114,6 @@ class DataBuilder:
             return [slope, intercept]
         def simpleLinearRegressionPredict(slope, intercept, x):
             return slope * x + intercept
-        mediumIncomes.reverse()
         incomesSlope, incomesIntercept = simpleLinearRegression(mediumIncomes)
         if len(incomes) >= 3 * 12:
             incomesNextPointPredictium = len(mediumIncomes) + 1
@@ -131,3 +126,9 @@ class DataBuilder:
                 next12points.append(pointIncome)
             next12MMediumIncome = functools.reduce(lambda a, b: a+b, next12points)
         return next12MMediumIncome
+    
+    def calculateRootPrice(self, yield12, premio, addIpcaToPremio, valorAtual):
+        valorAtual = float(valorAtual)
+        ipca = self.ipca if bool(addIpcaToPremio) else 0
+        rootPrice = (float(yield12) / (self.ntnbTax + float(premio) + ipca)) * valorAtual
+        return [rootPrice, rootPrice / valorAtual]
