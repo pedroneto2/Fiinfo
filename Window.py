@@ -13,6 +13,7 @@ class Window(QMainWindow):
         self.ui.setupUi(self)
         self.setWindowTitle('FIInfo')
         self.database = 'database.db'
+        self.createDB()
         self.dataBuilder = DataBuilder()
         
         self.ui.addFiiPushButton.clicked.connect(self.addFiiToTable)
@@ -223,3 +224,23 @@ class Window(QMainWindow):
         else:
             self.ui.statusbar.showMessage(errorMessage, 5000)
             self.enableDisableAll(False)
+            
+    def createDB(self):
+        sql = '''
+            CREATE TABLE IF NOT EXISTS "fiis"(
+                "grupo"	TEXT,
+                "ticker" TEXT,
+                "valor_atual" NUMERIC,
+                "p_vp" BLOB,
+                "premio" NUMERIC,
+                "ipca_no_premio" INTEGER,
+                "yield_12" NUMERIC,
+                "rendimento_12_projetado" NUMERIC,
+                PRIMARY KEY("ticker")
+            )'''
+        connection = self.createDbConnection()
+        cursor = connection.cursor()
+        cursor.execute(sql)
+        connection.commit()
+        cursor.close()
+        connection.close()
