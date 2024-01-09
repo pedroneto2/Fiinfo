@@ -5,7 +5,7 @@
 step 1: download the project folder trough git or trough navigator, as a zip file:
 ![image](https://github.com/pedroneto2/Fiinfo/assets/66081389/b5192c12-dd0c-4502-9bf3-d53e697a4196)
 
-step 2: Extract the zip file to a folder, case you had downloaded the zip file.
+step 2: Extract the zip file to a folder, case you downloaded the zip file.
 
 step 3: Install python trough the official site: https://www.python.org/downloads/
 
