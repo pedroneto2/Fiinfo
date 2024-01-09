@@ -1,6 +1,7 @@
 # Fiinfo
 
-How to create my executable file on WINDOWS?
+## How to create my executable file on WINDOWS?
+
 step 1: download the project folder trough git or trough navigator, as a zip file:
 ![image](https://github.com/pedroneto2/Fiinfo/assets/66081389/b5192c12-dd0c-4502-9bf3-d53e697a4196)
 
