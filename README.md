@@ -21,4 +21,4 @@ step 8: Install lxml library with the command 'pip install lxml'
 
 step 9: Go to the project root folder and generate the executable file with the command 'pyinstaller --onefile --noconsole .\Main.py'
 
-step 10: The file is generate. You can access it in the root folder, at path \dist\Main.exe
+step 10: The executable is ready! You can access it in the root folder, at path \dist\Main.exe.
