@@ -10,7 +10,7 @@ from lxml import html
 
 class DataBuilder:
     def __init__(self):
-        self.site = 'https://www.fundsexplorer.com.br/funds/'
+        self.site = ''
         self.session = requests.Session()
         self.ctx = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
         self.ctx.options |= 0x4
@@ -26,7 +26,7 @@ class DataBuilder:
         self.ipca = float(self.getIPCA12())
     
     def getIPCA12(self):
-        site = 'https://www.ibge.gov.br/explica/inflacao.php'
+        site = ''
         response = urllib.request.urlopen(site, context=self.ctx)
         tree = html.fromstring(response.read())
         rawIpca = tree.xpath('/html/body/header/div[4]/ul/li[2]/p[1]/text()')
@@ -34,7 +34,7 @@ class DataBuilder:
         return ipca
     
     def getNtnbTax(self):
-        response = requests.get('https://www.tesourodireto.com.br/json/br/com/b3/tesourodireto/service/api/treasurybondsinfo.json')
+        response = requests.get('')
         json = response.json()
         trsrList = json['response']['TrsrBdTradgList']
         for i in trsrList:
